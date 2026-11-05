@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ECE CGPA Calculator</title>
+<title>Engineering CGPA Calculator</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
@@ -129,10 +129,6 @@
   @media (prefers-reduced-motion: reduce) { .toast { transition: none; } }
 
   /* Auth */
-  .account-bar { display: flex; align-items: center; gap: 14px; padding: 10px 16px; background: var(--pcb-dark); color: #cfe6da; font-size: 13px; }
-  .account-bar span { font-family: var(--mono); }
-  .link-btn { font: inherit; font-size: 13px; color: #cfe6da; background: none; border: none; text-decoration: underline; cursor: pointer; padding: 0; margin-left: auto; }
-  .link-btn + .link-btn { margin-left: 14px; }
   .auth-wrap { padding: 40px 16px; }
   .auth-card { background: var(--card); border: 1px solid var(--line); padding: 20px; max-width: 420px; margin: 0 auto; }
   .auth-card form .search { margin-bottom: 0; }
@@ -146,12 +142,12 @@
 <header>
   <div class="wrap sheet">
     <span class="tick-bl"></span><span class="tick-br"></span>
-    <h1>ECE CGPA CALCULATOR</h1>
-    <p>Department of Electronic Engineering</p>
+    <h1>Engineering CGPA Calculator</h1>
+    <p id="deptLine">Select your department to begin</p>
     <div class="title-block">
       <span>DOC <b>CGPA-CALC</b></span>
-      <span>DEPT <b>ECE</b></span>
-      <span>REV <b>1.1</b></span>
+      <span>DEPT <b id="tbDept">—</b></span>
+      <span>REV <b>2.0</b></span>
     </div>
     <div class="actions">
       <button id="btnExport" type="button">Export results</button>
@@ -159,11 +155,6 @@
     </div>
   </div>
 </header>
-
-<div id="authAccount" class="wrap account-bar" hidden>
-  <span id="accountName"></span>
-  <button id="btnLogout" type="button" class="link-btn">Log out</button>
-</div>
 
 <div id="authScreen" class="wrap auth-wrap" hidden>
   <div class="auth-card">
@@ -213,15 +204,24 @@
 
 <main class="wrap">
   <div class="panel">
-    <label class="field" for="search">Find a course</label>
-    <input id="search" class="search" type="search" placeholder="e.g. ECE 311, circuit theory" autocomplete="off">
+    <label class="field" for="deptSelect">Select department</label>
+    <div class="select-wrap">
+      <select id="deptSelect" class="dropdown"></select>
+    </div>
+    <label class="field" for="search" style="margin-top:16px">Find a course</label>
+    <input id="search" class="search" type="search" placeholder="e.g. MTH 111, thermodynamics" autocomplete="off">
     <label class="check"><input type="checkbox" id="onlyGraded"> Show only courses I have graded</label>
     <label class="check"><input type="checkbox" id="fullPrecision"> Show full precision (5 d.p.)</label>
-    <label class="field" style="margin-top:16px">Select year</label>
-    <div class="select-wrap">
-      <select id="yearSelect" class="dropdown"></select>
+    <div id="browsePickers" hidden>
+      <label class="field" for="yearSelect" style="margin-top:16px">Select year</label>
+      <div class="select-wrap">
+        <select id="yearSelect" class="dropdown"></select>
+      </div>
+      <label class="field" for="semSelect" style="margin-top:16px">Select semester</label>
+      <div class="select-wrap">
+        <select id="semSelect" class="dropdown"></select>
+      </div>
     </div>
-    <div id="semPicker"></div>
   </div>
 
   <div id="content"></div>
@@ -251,10 +251,11 @@
 
   var GP = { A: 5, B: 4, C: 3, D: 2, E: 1, F: 0 };
   var GRADES = ["A", "B", "C", "D", "E", "F"];
-  var STORE_KEY = "ece-cgpa-v1";
+  var STORE_KEY = "engineering-cgpa-v1";
+  var OLD_ECE_KEY = "ece-cgpa-v1"; // saved by the earlier ECE-only version of this app
 
-  // [code, title, units]
-  var CURRICULUM = [
+  // Each department: blocks of { level, sem, courses: [[code, title, units], ...] }
+  var ECE_CURRICULUM = [
     { level: 100, sem: 1, courses: [
       ["MTH 111", "Elementary Mathematics I", 3],
       ["MTH 121", "Elementary Mathematics II", 3],
@@ -324,67 +325,166 @@
       ["EEE 332", "Electric Power Systems Principles", 3],
       ["EE 352", "Electric Power Systems Lab.", 1]
     ]}
+  ];;
+
+  var MEE_CURRICULUM = [
+    { level: 100, sem: 1, courses: [
+      ["ENGR 101", "Introduction to Engineering", 2],
+      ["MTH 111", "Elementary Mathematics I", 3],
+      ["MTH 121", "Elementary Mathematics II", 3],
+      ["CHM 101", "Basic Principles of Chemistry I", 2],
+      ["CHM 171", "Basic Practical Chemistry", 2],
+      ["PHY 121", "Fundamentals of Physics I", 3],
+      ["GSP 101", "Use of English I", 2],
+      ["GSP 111", "Use of Library & Study Skills", 2],
+      ["PHY 195", "Practical Physics II", 2]
+    ]},
+    { level: 100, sem: 2, courses: [
+      ["ENGR 102", "Applied Mechanics", 3],
+      ["MTH 122", "Elementary Mathematics III", 3],
+      ["CHM 112", "Basic Principles of Physical Chemistry", 2],
+      ["PHY 116", "General Physics for Physical Sciences II", 2],
+      ["PHY 124", "Fundamentals of Physics III", 3],
+      ["GSP 102", "Use of English II", 2],
+      ["CHM 122", "Basic Principles of Organic Chemistry", 2]
+    ]},
+    { level: 200, sem: 1, courses: [
+      ["ENGR 201", "Material Science", 2],
+      ["ENGR 202", "Material Science Laboratory", 1],
+      ["CVE 212", "Strength of Material Laboratory I", 1],
+      ["CVE 211", "Strength of Material I", 2],
+      ["EEE 211", "Basic Electrical Engineering", 3],
+      ["MEE 211", "Engineering Drawing I", 2],
+      ["MEE 261", "Thermodynamics I", 2],
+      ["GSP 201", "Basic Concepts and Theories of Peace and Conflict", 2],
+      ["GSP 207", "Logic, Philosophy and Human Existence", 2],
+      ["MTH 207", "Advanced Mathematics VII", 2]
+    ]},
+    { level: 200, sem: 2, courses: [
+      ["MTH 206", "Advanced Mathematics VI", 2],
+      ["MTH 208", "Advance Mathematics VIII", 2],
+      ["CVE 221", "Fluid Mechanics I", 2],
+      ["CVE 222", "Fluid Mechanics Laboratory", 1],
+      ["MEE 212", "Workshop Technology I", 2],
+      ["EEE 251", "Basic Electrical Engineering Laboratory", 1],
+      ["GSP 202", "Peace and Conflict Resolution II", 2],
+      ["GSP 208", "Nigerian Peoples and Cultures", 2],
+      ["MEE 202", "Computing and Programming for Mechanical Engineers", 2],
+      ["MEE 204", "Computing and Programming Laboratory", 2]
+    ]},
+    { level: 300, sem: 1, courses: [
+      ["CED 341", "Introduction to Entrepreneurship", 2],
+      ["STA 205", "Statistics for Physical Sciences & Engr. I", 2],
+      ["MEE 351", "Mechanics of Fluids", 2],
+      ["MEE 361", "Engineering Thermodynamics II", 2],
+      ["MEE 343", "Measurement and Instrumentation", 2],
+      ["MEE 323", "Mechanics of Machines Laboratory I", 1],
+      ["MEE 321", "Thermo-Fluids Laboratory", 1],
+      ["MEE 315", "Workshop Practice", 1],
+      ["MEE 313", "Mechanical Engineering Design I", 3],
+      ["MEE 311", "Manufacturing Processes", 2],
+      ["MEE 341", "Mechanics of Machines", 2]
+    ]},
+    { level: 300, sem: 2, courses: [
+      ["CED 342", "Business Development & Management", 2],
+      ["ENGR 301", "Engineering Analysis", 4],
+      ["EE 311", "Electrical Engineering II", 3],
+      ["MEE 332", "Mechanics of Materials I", 3],
+      ["MEE 324", "CAD/CAM Laboratory", 1],
+      ["MEE 322", "Mechanics of Materials Laboratory", 1],
+      ["MEE 312", "CAD/CAM", 2],
+      ["MEE 372", "Introduction to Heat and Mass Transfer", 2],
+      ["MEE 314", "CAM/CAD", 2]
+    ]}
   ];
 
-  // Flatten
-  var ALL = [];
-  CURRICULUM.forEach(function (blk) {
-    blk.courses.forEach(function (c) {
-      ALL.push({ code: c[0], title: c[1], defUnits: c[2], level: blk.level, sem: blk.sem });
+  var DEPARTMENTS = [
+    { id: "ece", name: "Electronic Engineering", short: "ECE", curriculum: ECE_CURRICULUM },
+    { id: "mee", name: "Mechanical Engineering", short: "MEE", curriculum: MEE_CURRICULUM }
+  ];
+
+  // Flatten each department's curriculum into a simple course list
+  DEPARTMENTS.forEach(function (d) {
+    d.courses = [];
+    d.curriculum.forEach(function (blk) {
+      blk.courses.forEach(function (c) {
+        d.courses.push({ code: c[0], title: c[1], units: c[2], level: blk.level, sem: blk.sem });
+      });
     });
   });
-  var LEVELS = [100, 200, 300];
 
-  // State
-  var state = { grades: {}, carried: {} };
+  var LEVEL_OPTIONS = [100, 200, 300, 400, 500];
+
+  function deptById(id) {
+    for (var i = 0; i < DEPARTMENTS.length; i++) if (DEPARTMENTS[i].id === id) return DEPARTMENTS[i];
+    return null;
+  }
+
+  // Grades and carry-over flags are kept per department, so a course code shared
+  // by two departments (e.g. MTH 111) never mixes their results.
+  function sanitize(d) {
+    var out = { dept: "", grades: {}, carried: {} };
+    if (d && typeof d === "object" && d.dept && deptById(d.dept)) out.dept = d.dept;
+    DEPARTMENTS.forEach(function (dep) {
+      var valid = Object.create(null);
+      dep.courses.forEach(function (c) { valid[c.code] = true; });
+      var g = d && d.grades && d.grades[dep.id];
+      var co = d && d.carried && d.carried[dep.id];
+      out.grades[dep.id] = {}; out.carried[dep.id] = {};
+      if (g && typeof g === "object") Object.keys(g).forEach(function (k) {
+        if (valid[k] && GP.hasOwnProperty(g[k])) out.grades[dep.id][k] = g[k];
+      });
+      if (co && typeof co === "object") Object.keys(co).forEach(function (k) {
+        if (valid[k] && co[k]) out.carried[dep.id][k] = true;
+      });
+    });
+    return out;
+  }
+
+  var state = sanitize(null);
   var ui = { year: 100, sem: 1, query: "", onlyGraded: false, full: false };
 
-  // Storage (falls back silently if unavailable)
   function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) {} }
   function load() {
     try {
       var raw = localStorage.getItem(STORE_KEY);
-      if (raw) applyData(JSON.parse(raw));
+      if (raw) { state = sanitize(JSON.parse(raw)); return; }
+      // First visit to this version: bring over grades saved by the old ECE-only app
+      var old = localStorage.getItem(OLD_ECE_KEY);
+      if (old) {
+        var o = JSON.parse(old);
+        var m = sanitize({ dept: "ece", grades: { ece: o && o.grades }, carried: { ece: o && o.carried } });
+        if (Object.keys(m.grades.ece).length) { state = m; save(); }
+      }
     } catch (e) {}
   }
-  function applyData(d) {
-    var g = {}, co = {};
-    var byCode = {};
-    ALL.forEach(function (c) { byCode[c.code] = c; });
-    if (d && d.grades) Object.keys(d.grades).forEach(function (k) {
-      if (byCode[k] && GP.hasOwnProperty(d.grades[k])) g[k] = d.grades[k];
-    });
-    if (d && d.carried) Object.keys(d.carried).forEach(function (k) {
-      if (byCode[k] && d.carried[k]) co[k] = true;
-    });
-    state.grades = g; state.carried = co;
-  }
 
-  function unitsOf(c) { return c.defUnits; }
+  function curDept() { return deptById(state.dept); }
+  function curCourses() { var d = curDept(); return d ? d.courses : []; }
+  function gradeOf(code) { var g = state.grades[state.dept]; return g ? g[code] : undefined; }
+  function isCarried(code) { var c = state.carried[state.dept]; return !!(c && c[code]); }
+  function bucket(map) { if (!map[state.dept]) map[state.dept] = {}; return map[state.dept]; }
 
-  // A carried-over (repeated) course means the earlier sitting was an F (0 quality points).
-  // The retake's quality points are averaged with that 0, per the carryover policy.
+  // A carried-over course counts its earlier sitting as an F (0 quality points),
+  // so the retake's quality points are averaged with that 0. Units still count once.
   function coursePoints(c) {
-    var g = state.grades[c.code];
+    var g = gradeOf(c.code);
     if (!g) return null;
-    var u = unitsOf(c);
-    var full = u * GP[g];
-    return state.carried[c.code] ? full / 2 : full;
+    var full = c.units * GP[g];
+    return isCarried(c.code) ? full / 2 : full;
   }
 
-  // Calculation
   function calc(list) {
     var units = 0, qp = 0, n = 0;
     list.forEach(function (c) {
-      var g = state.grades[c.code];
-      if (!g) return;
-      var u = unitsOf(c);
-      if (u <= 0) return;
-      n++; units += u; qp += coursePoints(c);
+      if (!gradeOf(c.code) || c.units <= 0) return;
+      n++; units += c.units; qp += coursePoints(c);
     });
     return { n: n, units: units, qp: qp, gpa: units > 0 ? qp / units : null };
   }
+
   function fmt(x) { return x.toFixed(ui.full ? 5 : 2); }
+  function trimNum(x) { return (Math.round(x * 100) / 100).toString(); }
 
   function degreeClass(x) {
     if (x >= 4.5) return "First Class";
@@ -395,52 +495,51 @@
     return "Below pass";
   }
 
-  // Rendering
+  function el(id) { return document.getElementById(id); }
   function esc(s) { return String(s).replace(/[&<>"]/g, function (m) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[m]; }); }
 
-  function renderSummary() {
-    var t = calc(ALL);
-    var el = document.getElementById("cgpa");
-    var cls = document.getElementById("cgClass");
-    if (t.gpa === null) {
-      el.textContent = "no results entered yet"; el.className = "cg-value empty"; cls.hidden = true;
-    } else {
-      el.textContent = fmt(t.gpa); el.className = "cg-value";
-      cls.textContent = degreeClass(t.gpa); cls.hidden = false;
-    }
-    document.getElementById("sCourses").textContent = t.n;
-    document.getElementById("sUnits").textContent = t.units;
-    document.getElementById("sQP").textContent = t.qp;
+  // ---------- Rendering ----------
+  function renderHeader() {
+    var d = curDept();
+    el("deptLine").textContent = d ? "Department of " + d.name : "Select your department to begin";
+    el("tbDept").textContent = d ? d.short : "—";
   }
 
-  var LEVEL_OPTIONS = [100, 200, 300, 400, 500];
+  function renderSummary() {
+    var t = calc(curCourses());
+    var v = el("cgpa"), cls = el("cgClass");
+    if (t.gpa === null) {
+      v.textContent = "no results entered yet"; v.className = "cg-value empty"; cls.hidden = true;
+    } else {
+      v.textContent = fmt(t.gpa); v.className = "cg-value";
+      cls.textContent = degreeClass(t.gpa); cls.hidden = false;
+    }
+    el("sCourses").textContent = t.n;
+    el("sUnits").textContent = t.units;
+    el("sQP").textContent = trimNum(t.qp);
+  }
 
-  function renderTabs() {
-    var yearSel = document.getElementById("yearSelect");
-    yearSel.innerHTML = LEVEL_OPTIONS.map(function (l) {
-      return '<option value="' + l + '"' + (ui.year === l ? " selected" : "") + ">" + l + " Level</option>";
+  function populateSelectors() {
+    el("deptSelect").innerHTML = '<option value="">Choose your department</option>' +
+      DEPARTMENTS.map(function (d) { return '<option value="' + d.id + '">' + esc(d.name) + "</option>"; }).join("");
+    el("yearSelect").innerHTML = LEVEL_OPTIONS.map(function (l) {
+      return '<option value="' + l + '">' + l + " Level</option>";
     }).join("");
+    el("semSelect").innerHTML = '<option value="1">First semester</option><option value="2">Second semester</option>';
+  }
 
-    var semHost = document.getElementById("semPicker");
-    if (ui.query) { semHost.innerHTML = ""; return; }
-    semHost.innerHTML =
-      '<label class="field" style="margin-top:16px">Select semester</label>' +
-      '<div class="select-wrap">' +
-        '<select id="semSelect" class="dropdown">' +
-          '<option value="1"' + (ui.sem === 1 ? " selected" : "") + ">First semester</option>" +
-          '<option value="2"' + (ui.sem === 2 ? " selected" : "") + ">Second semester</option>" +
-        "</select>" +
-      "</div>";
-    document.getElementById("semSelect").addEventListener("change", function (e) {
-      ui.sem = Number(e.target.value); renderTabs(); renderContent();
-    });
+  function syncSelectors() {
+    el("deptSelect").value = state.dept;
+    el("yearSelect").value = String(ui.year);
+    el("semSelect").value = String(ui.sem);
+    // Searching looks across every level and semester, so the pickers step aside
+    el("browsePickers").hidden = !curDept() || !!ui.query;
   }
 
   function courseHTML(c) {
-    var g = state.grades[c.code] || "";
-    var u = unitsOf(c);
+    var g = gradeOf(c.code) || "";
     var gp = g ? GP[g] : null;
-    var carried = !!state.carried[c.code];
+    var carried = isCarried(c.code);
     var pts = g ? coursePoints(c) : null;
     var opts = '<option value="">—</option>' + GRADES.map(function (x) {
       return '<option value="' + x + '"' + (x === g ? " selected" : "") + ">" + x + "</option>";
@@ -450,7 +549,7 @@
         '<div class="code">' + esc(c.code) + (carried ? ' <span class="co-badge">carried over</span>' : "") + "</div>" +
         (c.title ? '<div class="title">' + esc(c.title) + "</div>" : "") +
         '<div class="meta">' +
-          "<span>Units<b>" + u + "</b></span>" +
+          "<span>Units<b>" + c.units + "</b></span>" +
           "<span>Grade pt<b>" + (gp === null ? "—" : gp) + "</b></span>" +
           "<span>Course pt<b>" + (pts === null ? "—" : trimNum(pts)) + "</b></span>" +
         "</div>" +
@@ -458,14 +557,6 @@
       "</div>" +
       '<select class="grade" data-grade="' + esc(c.code) + '" aria-label="Grade for ' + esc(c.code) + '">' + opts + "</select>" +
     "</div>";
-  }
-  function trimNum(x) { return (Math.round(x * 100) / 100).toString(); }
-
-  function semBlock(title, list) {
-    var t = calc(list);
-    var stat = t.gpa === null ? "no grades yet" : "GPA " + fmt(t.gpa) + " · " + t.units + " units graded";
-    return '<section class="sem"><div class="sem-head"><h2>' + esc(title) + "</h2><span>" + stat + '</span></div><div class="list">' +
-      list.map(courseHTML).join("") + "</div></section>";
   }
 
   function visible(c) {
@@ -475,112 +566,126 @@
       var hayNoSpace = hay.replace(/\s+/g, "");
       if (hay.indexOf(q) === -1 && hayNoSpace.indexOf(q.replace(/\s+/g, "")) === -1) return false;
     }
-    if (ui.onlyGraded && !state.grades[c.code]) return false;
+    if (ui.onlyGraded && !gradeOf(c.code)) return false;
     return true;
   }
 
-  function renderContent() {
-    var host = document.getElementById("content");
-    var html = "";
-    var searching = !!ui.query;
-
-    if (searching) {
-      // Search looks across every year and semester, grouped as usual
-      LEVELS.forEach(function (l) {
-        [1, 2].forEach(function (s) {
-          var list = ALL.filter(function (c) { return c.level === l && c.sem === s && visible(c); });
-          if (!list.length) return;
-          var full = ALL.filter(function (c) { return c.level === l && c.sem === s; });
-          var title = l + " Level · " + (s === 1 ? "First" : "Second") + " semester";
-          html += semBlockWithFull(title, list, full);
-        });
-      });
-    } else {
-      // Normal browsing: just the selected year + semester
-      var full2 = ALL.filter(function (c) { return c.level === ui.year && c.sem === ui.sem; });
-      if (!full2.length) {
-        host.innerHTML = '<div class="list" style="margin-top:20px"><div class="empty-msg">No courses added yet.</div></div>';
-        return;
-      }
-      var list2 = full2.filter(visible);
-      var title2 = ui.year + " Level · " + (ui.sem === 1 ? "First" : "Second") + " semester";
-      if (list2.length) html += semBlockWithFull(title2, list2, full2);
-    }
-
-    if (!html) {
-      html = '<div class="list" style="margin-top:20px"><div class="empty-msg">' +
-        (ui.onlyGraded && !searching ? "You haven't graded any courses here yet. Untick “Show only courses I have graded” to add grades." : "No courses match your search.") +
-        "</div></div>";
-    }
-    host.innerHTML = html;
-  }
-
-  function semBlockWithFull(title, list, full) {
+  function semBlock(title, list, full) {
     var t = calc(full);
     var stat = t.gpa === null ? "no grades yet" : "GPA " + fmt(t.gpa) + " · " + t.units + " units graded";
     return '<section class="sem"><div class="sem-head"><h2>' + esc(title) + "</h2><span>" + stat + '</span></div><div class="list">' +
       list.map(courseHTML).join("") + "</div></section>";
   }
 
-  function renderAll() { renderSummary(); renderTabs(); renderContent(); }
+  function message(text) {
+    return '<div class="list" style="margin-top:20px"><div class="empty-msg">' + text + "</div></div>";
+  }
 
-  // Toast
+  function renderContent() {
+    var host = el("content");
+    var dept = curDept();
+    if (!dept) { host.innerHTML = message("Select your department above to see its courses."); return; }
+
+    var all = dept.courses;
+    var html = "";
+
+    if (ui.query) {
+      LEVEL_OPTIONS.forEach(function (l) {
+        [1, 2].forEach(function (s) {
+          var full = all.filter(function (c) { return c.level === l && c.sem === s; });
+          var list = full.filter(visible);
+          if (list.length) html += semBlock(l + " Level · " + (s === 1 ? "First" : "Second") + " semester", list, full);
+        });
+      });
+      host.innerHTML = html || message("No courses match your search.");
+      return;
+    }
+
+    var fullSem = all.filter(function (c) { return c.level === ui.year && c.sem === ui.sem; });
+    if (!fullSem.length) { host.innerHTML = message("No courses added yet."); return; }
+    var list2 = fullSem.filter(visible);
+    if (!list2.length) {
+      host.innerHTML = message("You haven't graded any courses here yet. Untick “Show only courses I have graded” to add grades.");
+      return;
+    }
+    host.innerHTML = semBlock(ui.year + " Level · " + (ui.sem === 1 ? "First" : "Second") + " semester", list2, fullSem);
+  }
+
+  function renderAll() { renderHeader(); renderSummary(); syncSelectors(); renderContent(); }
+
   var toastTimer;
   function toast(msg) {
-    var t = document.getElementById("toast");
+    var t = el("toast");
     t.textContent = msg; t.classList.add("show");
     clearTimeout(toastTimer);
     toastTimer = setTimeout(function () { t.classList.remove("show"); }, 2400);
   }
 
-  // Events
-  document.getElementById("content").addEventListener("change", function (e) {
+  // ---------- Events ----------
+  el("deptSelect").addEventListener("change", function (e) {
+    state.dept = e.target.value;
+    save(); renderAll();
+  });
+  el("yearSelect").addEventListener("change", function (e) {
+    ui.year = Number(e.target.value); renderContent();
+  });
+  el("semSelect").addEventListener("change", function (e) {
+    ui.sem = Number(e.target.value); renderContent();
+  });
+
+  el("content").addEventListener("change", function (e) {
     var g = e.target.getAttribute("data-grade");
     var co = e.target.getAttribute("data-carried");
+    if (!state.dept) return;
     if (g) {
-      if (e.target.value) state.grades[g] = e.target.value; else delete state.grades[g];
+      var gm = bucket(state.grades);
+      if (e.target.value) gm[g] = e.target.value; else delete gm[g];
       save(); renderSummary(); renderContent();
     } else if (co) {
-      if (e.target.checked) state.carried[co] = true; else delete state.carried[co];
+      var cm = bucket(state.carried);
+      if (e.target.checked) cm[co] = true; else delete cm[co];
       save(); renderSummary(); renderContent();
     }
   });
 
-  document.getElementById("yearSelect").addEventListener("change", function (e) {
-    ui.year = Number(e.target.value); renderTabs(); renderContent();
+  el("search").addEventListener("input", function (e) {
+    ui.query = e.target.value.trim(); syncSelectors(); renderContent();
   });
-  // semSelect's own change listener is attached inside renderTabs(), since
-  // the element is rebuilt there each time.
-
-  document.getElementById("search").addEventListener("input", function (e) {
-    ui.query = e.target.value.trim(); renderTabs(); renderContent();
-  });
-  document.getElementById("onlyGraded").addEventListener("change", function (e) {
+  el("onlyGraded").addEventListener("change", function (e) {
     ui.onlyGraded = e.target.checked; renderContent();
   });
-  document.getElementById("fullPrecision").addEventListener("change", function (e) {
+  el("fullPrecision").addEventListener("change", function (e) {
     ui.full = e.target.checked; renderSummary(); renderContent();
   });
 
-  document.getElementById("btnExport").addEventListener("click", function () {
-    var data = JSON.stringify({ app: "ece-cgpa", version: 1, grades: state.grades, carried: state.carried }, null, 2);
+  el("btnExport").addEventListener("click", function () {
+    var d = curDept();
+    if (!d) { toast("Choose a department first"); return; }
+    var data = JSON.stringify({
+      app: "engineering-cgpa", version: 2, department: d.id,
+      grades: state.grades[d.id] || {}, carried: state.carried[d.id] || {}
+    }, null, 2);
     var blob = new Blob([data], { type: "application/json" });
     var a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = "ece-cgpa-results.json";
+    a.download = "engineering-cgpa-" + d.id + "-results.json";
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
     toast("Results exported");
   });
 
-  document.getElementById("btnReset").addEventListener("click", function () {
-    if (!Object.keys(state.grades).length && !Object.keys(state.carried).length) { toast("Nothing to reset"); return; }
-    if (confirm("Clear all grades? This can't be undone.")) {
-      state = { grades: {}, carried: {} };
+  el("btnReset").addEventListener("click", function () {
+    var d = curDept();
+    if (!d) { toast("Choose a department first"); return; }
+    var g = state.grades[d.id] || {}, co = state.carried[d.id] || {};
+    if (!Object.keys(g).length && !Object.keys(co).length) { toast("Nothing to reset"); return; }
+    if (confirm("Clear all grades for " + d.name + "? This can't be undone.")) {
+      state.grades[d.id] = {}; state.carried[d.id] = {};
       save(); renderAll(); toast("Results reset");
     }
   });
 
+  populateSelectors();
   load();
   renderAll();
 })();
@@ -597,7 +702,7 @@
   } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
   import {
     getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
-    updateProfile, onAuthStateChanged, signOut
+    updateProfile, onAuthStateChanged
   } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 
   // ---- 1) Paste your Firebase project's config here (Firebase Console > Project settings > Your apps) ----
@@ -630,7 +735,6 @@
 
   // Screen switching
   function showScreen(name) {
-    el("authAccount").hidden = name !== "app";
     el("authScreen").hidden = name !== "login";
     el("appScreen").hidden = name !== "app";
   }
@@ -668,11 +772,8 @@
       .catch(function (err) { showAuthError(friendlyError(err)); });
   });
 
-  el("btnLogout").addEventListener("click", function () { signOut(auth); });
-
   onAuthStateChanged(auth, function (user) {
     if (user) {
-      el("accountName").textContent = user.displayName || user.email;
       showScreen("app");
     } else {
       showScreen("login");
