@@ -110,11 +110,20 @@
   .co-badge { display: inline-block; font-family: var(--mono); font-size: 10px; font-weight: 600; letter-spacing: .03em; color: #8a5a00; background: var(--amber); border-radius: 3px; padding: 2px 7px; vertical-align: middle; margin-left: 4px; }
   .co-check { margin-top: 10px; font-size: 14px; gap: 8px; }
   .co-check input { width: 18px; height: 18px; }
+  .course > .co-panel { grid-column: 1 / -1; border-top: 1px dashed #d9bf8c; padding-top: 12px; }
+  .co-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .co-field { display: block; }
+  .co-field span { display: block; font-family: var(--mono); font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+  .dropdown.small { font-size: 14px; padding: 10px 30px 10px 10px; }
+  .co-field .select-wrap::after { right: 12px; }
+  .co-note { margin-top: 10px; font-size: 13px; color: #5c3b00; }
+  .notice { margin: 20px 0 0; padding: 12px 14px; background: var(--amber-soft); border: 1px solid var(--amber); border-left-width: 4px; font-weight: 700; font-size: 14px; line-height: 1.45; color: #5c3b00; }
   .code { font-family: var(--mono); font-weight: 600; font-size: 18px; color: var(--ink); }
   .title { color: #52605a; font-size: 15px; margin-top: 2px; }
   .meta { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; margin-top: 8px; font-family: var(--mono); font-size: 11px; color: var(--muted); }
   .meta b { color: var(--text); font-size: 15px; margin-left: 4px; font-variant-numeric: tabular-nums; font-family: var(--sans); }
   select.grade { width: 100px; font: inherit; font-size: 19px; font-family: var(--mono); padding: 13px 8px; border: 1px solid var(--line); border-radius: 4px; background: #fff; color: var(--ink); cursor: pointer; }
+  select.grade.unset { color: var(--muted); font-size: 17px; }
   .course.graded select.grade { border-color: var(--pcb); color: var(--pcb); font-weight: 700; }
   .empty-msg { padding: 22px 16px; color: var(--muted); text-align: center; }
 
@@ -238,7 +247,7 @@
       <tr><td>0 – 39</td><td>F</td><td>0</td></tr>
     </table>
     <p>CGPA = total quality points ÷ total units of graded courses. Quality points for a course = units × grade points. Courses you leave ungraded are ignored.</p>
-    <p><b>Carried over courses:</b> tick "Carried over" on a course you failed and are retaking. The earlier sitting is treated as an F (0 quality points), so the course's quality points become (units × new grade points) ÷ 2 — the retake averaged with that 0. Units still count once toward the total.</p>
+    <p><b>Carried over courses:</b> tick "Carried over" on a course you failed and later passed after rewriting it, then choose how many times you carried it over and your new pass grade. Each earlier F adds 0 points but its units still count. For example, failing a 3-unit course twice and then getting a B is (0 + 0 + 12) ÷ (3 + 3 + 3).</p>
   </div>
 </main>
 </div>
@@ -251,6 +260,8 @@
 
   var GP = { A: 5, B: 4, C: 3, D: 2, E: 1, F: 0 };
   var GRADES = ["A", "B", "C", "D", "E", "F"];
+  var PASS_GRADES = ["A", "B", "C", "D", "E"]; // grades a carried-over course can be passed with
+  var MAX_TIMES = 5;                           // most carry-overs the dropdown offers
   var STORE_KEY = "engineering-cgpa-v1";
   var OLD_ECE_KEY = "ece-cgpa-v1"; // saved by the earlier ECE-only version of this app
 
@@ -398,9 +409,84 @@
     ]}
   ];
 
+  var BME_CURRICULUM = [
+    { level: 100, sem: 1, courses: [
+      ["MTH 111", "Elementary Mathematics I", 3],
+      ["MTH 121", "Elementary Mathematics II", 3],
+      ["PHY 121", "Fundamentals of Physics I", 3],
+      ["PHY 195", "Practical Physics II", 2],
+      ["CHM 101", "Basic Principles of Chemistry I", 2],
+      ["BIO 151", "General Biology I", 3],
+      ["GSP 111", "Use of Library & Study Skills", 2],
+      ["EGR 101", "Introduction to Engineering", 2],
+      ["CHM 171", "Basic Practical Chemistry", 2],
+      ["GSP 101", "Use of English I", 2]
+    ]},
+    { level: 100, sem: 2, courses: [
+      ["CHM 112", "Basic Principles of Physical Chemistry", 2],
+      ["CHM 122", "Basic Principles of Organic Chemistry", 2],
+      ["BIO 152", "General Biology II", 3],
+      ["BIO 154", "General Practical Biology II", 2],
+      ["GSP 102", "Use of English II", 2],
+      ["MTH 122", "Elementary Mathematics III", 3],
+      ["PHY 116", "General Physics for Physical Sciences II", 2],
+      ["PHY 124", "Fundamentals of Physics III", 3]
+    ]},
+    { level: 200, sem: 1, courses: [
+      ["EGR 201", "Material Science", 2],
+      ["MTH 207", "Advanced Mathematics VII", 2],
+      ["EEE 211", "Basic Electrical Engineering", 3],
+      ["EGR 213", "Material Science Laboratory", 1],
+      ["MEE 211", "Engineering Drawing I", 2],
+      ["MEE 261", "Thermodynamics I", 2],
+      ["GSP 201", "Basic Concepts and Theories of Peace and Conflict", 2],
+      ["BME 203", "Introduction to Biomedical Engineering", 2],
+      ["GSP 207", "Logic, Philosophy and Human Existence", 2],
+      ["BME 201", "Human Physiology I", 2]
+    ]},
+    { level: 200, sem: 2, courses: [
+      ["ECE 272", "Engineering Computer Programming", 3],
+      ["BME 262", "Basic Biomedical Engineering Laboratory Practice", 1],
+      ["GSP 208", "Nigerian Peoples and Cultures", 2],
+      ["GSP 202", "Peace and Conflict Resolution II", 2],
+      ["EEE 252A", "Basic Electrical Engineering Laboratory/Practice", 1],
+      ["MEE 212", "Workshop Technology I", 2],
+      ["BCH 202", "General Biochemistry II", 3],
+      ["MTH 208", "Advance Mathematics VIII", 2],
+      ["MTH 206", "Advanced Mathematics VI", 2],
+      ["BME 202", "Human Physiology II", 3],
+      ["ECE 282", "Engineering Computer Programming Laboratory", 1]
+    ]},
+    { level: 300, sem: 1, courses: [
+      ["CED 341", "Introduction to Entrepreneurship", 2],
+      ["BME 301", "Clinical Deformities and Rehabilitation Engineering", 2],
+      ["BME 321", "Human Biomechanics", 2],
+      ["BME 313", "Biomedical Instrumentation I", 2],
+      ["BME 331", "Bioengineering Materials I", 2],
+      ["BME 305", "Introductory Genetics for Biomedical Engineering", 2],
+      ["BME 307", "Introduction to Bio-Fluid Mechanics", 2],
+      ["BME 361", "Cell and Biomaterial Engineering Laboratory II", 1],
+      ["BME 303", "Statistics for Healthcare Professionals", 2],
+      ["BME 311", "Biomedical Electronics I", 3]
+    ]},
+    { level: 300, sem: 2, courses: [
+      ["CED 342", "Business Development & Management", 2],
+      ["BME 302", "Introduction to Bionics", 2],
+      ["EGR 302", "Engineering Analysis", 4],
+      ["BME 312", "Biomedical Electronics II", 2],
+      ["BME 314", "Biomedical Instrumentation II", 2],
+      ["BME 316", "Biomedical Radiation Technology", 2],
+      ["BME 332", "Bioengineering Materials II", 2],
+      ["BME 304", "Design Thinking and Innovation", 2],
+      ["BME 362", "Biomechanics Laboratory", 1],
+      ["BME 306", "Technical Report Writing", 3]
+    ]}
+  ];
+
   var DEPARTMENTS = [
     { id: "ece", name: "Electronic Engineering", short: "ECE", curriculum: ECE_CURRICULUM },
-    { id: "mee", name: "Mechanical Engineering", short: "MEE", curriculum: MEE_CURRICULUM }
+    { id: "mee", name: "Mechanical Engineering", short: "MEE", curriculum: MEE_CURRICULUM },
+    { id: "bme", name: "Biomedical Engineering", short: "BME", curriculum: BME_CURRICULUM }
   ];
 
   // Flatten each department's curriculum into a simple course list
@@ -430,12 +516,25 @@
       dep.courses.forEach(function (c) { valid[c.code] = true; });
       var g = d && d.grades && d.grades[dep.id];
       var co = d && d.carried && d.carried[dep.id];
-      out.grades[dep.id] = {}; out.carried[dep.id] = {};
+      var G = out.grades[dep.id] = {}, C = out.carried[dep.id] = {};
       if (g && typeof g === "object") Object.keys(g).forEach(function (k) {
-        if (valid[k] && GP.hasOwnProperty(g[k])) out.grades[dep.id][k] = g[k];
+        if (valid[k] && GP.hasOwnProperty(g[k])) G[k] = g[k];
       });
       if (co && typeof co === "object") Object.keys(co).forEach(function (k) {
-        if (valid[k] && co[k]) out.carried[dep.id][k] = true;
+        if (!valid[k] || !co[k]) return;
+        var v = co[k], times = 1, grade = "";
+        if (v === true) {
+          // saved by the earlier version, where the grade box held the new grade
+          if (G[k] === "F") return;                    // an F isn't a pass: keep it as a plain F
+          if (G[k]) { grade = G[k]; delete G[k]; }
+        } else if (typeof v === "object") {
+          var t = Math.floor(Number(v.times));
+          if (t >= 1 && t <= MAX_TIMES) times = t;
+          if (PASS_GRADES.indexOf(v.grade) !== -1) grade = v.grade;
+        } else {
+          return;
+        }
+        C[k] = { times: times, grade: grade };
       });
     });
     return out;
@@ -454,7 +553,7 @@
       if (old) {
         var o = JSON.parse(old);
         var m = sanitize({ dept: "ece", grades: { ece: o && o.grades }, carried: { ece: o && o.carried } });
-        if (Object.keys(m.grades.ece).length) { state = m; save(); }
+        if (Object.keys(m.grades.ece).length || Object.keys(m.carried.ece).length) { state = m; save(); }
       }
     } catch (e) {}
   }
@@ -462,23 +561,34 @@
   function curDept() { return deptById(state.dept); }
   function curCourses() { var d = curDept(); return d ? d.courses : []; }
   function gradeOf(code) { var g = state.grades[state.dept]; return g ? g[code] : undefined; }
-  function isCarried(code) { var c = state.carried[state.dept]; return !!(c && c[code]); }
+  function carryOf(code) { var c = state.carried[state.dept]; return (c && c[code]) || null; }
   function bucket(map) { if (!map[state.dept]) map[state.dept] = {}; return map[state.dept]; }
 
-  // A carried-over course counts its earlier sitting as an F (0 quality points),
-  // so the retake's quality points are averaged with that 0. Units still count once.
+  // The grade that counts for a course: its carry-over pass grade if it was carried
+  // over (nothing counts until that is chosen), otherwise the normal grade.
+  function effectiveGrade(code) {
+    var co = carryOf(code);
+    return co ? co.grade : gradeOf(code);
+  }
+
+  // Every sitting of a carried-over course counts its units, but only the pass earns
+  // points (each earlier F adds 0). Failing a 3-unit course twice and then getting a B
+  // is (0 + 0 + 12) ÷ (3 + 3 + 3).
   function coursePoints(c) {
-    var g = gradeOf(c.code);
-    if (!g) return null;
-    var full = c.units * GP[g];
-    return isCarried(c.code) ? full / 2 : full;
+    var g = effectiveGrade(c.code);
+    return g ? c.units * GP[g] : null;
+  }
+
+  function courseUnits(c) {
+    var co = carryOf(c.code);
+    return co ? c.units * (co.times + 1) : c.units;
   }
 
   function calc(list) {
     var units = 0, qp = 0, n = 0;
     list.forEach(function (c) {
-      if (!gradeOf(c.code) || c.units <= 0) return;
-      n++; units += c.units; qp += coursePoints(c);
+      if (!effectiveGrade(c.code) || c.units <= 0) return;
+      n++; units += courseUnits(c); qp += coursePoints(c);
     });
     return { n: n, units: units, qp: qp, gpa: units > 0 ? qp / units : null };
   }
@@ -536,26 +646,62 @@
     el("browsePickers").hidden = !curDept() || !!ui.query;
   }
 
+  function timesOptions(sel) {
+    var h = "";
+    for (var n = 1; n <= MAX_TIMES; n++) {
+      h += '<option value="' + n + '"' + (n === sel ? " selected" : "") + ">" + n + (n === 1 ? " time" : " times") + "</option>";
+    }
+    return h;
+  }
+
   function courseHTML(c) {
-    var g = gradeOf(c.code) || "";
+    var co = carryOf(c.code);
+    var carried = !!co;
+    var g = effectiveGrade(c.code) || "";
     var gp = g ? GP[g] : null;
-    var carried = isCarried(c.code);
     var pts = g ? coursePoints(c) : null;
-    var opts = '<option value="">—</option>' + GRADES.map(function (x) {
-      return '<option value="' + x + '"' + (x === g ? " selected" : "") + ">" + x + "</option>";
-    }).join("");
+    var code = esc(c.code);
+
+    // Normal grade box (a carried-over course uses the panel below instead)
+    var mainSelect = "";
+    if (!carried) {
+      var cur = gradeOf(c.code) || "";
+      var opts = '<option value="">Grade</option>' + GRADES.map(function (x) {
+        return '<option value="' + x + '"' + (x === cur ? " selected" : "") + ">" + x + "</option>";
+      }).join("");
+      mainSelect = '<select class="grade' + (cur ? "" : " unset") + '" data-grade="' + code + '" aria-label="Grade for ' + code + '">' + opts + "</select>";
+    }
+
+    var panel = "";
+    if (carried) {
+      var passOpts = '<option value="">Select</option>' + PASS_GRADES.map(function (x) {
+        return '<option value="' + x + '"' + (x === co.grade ? " selected" : "") + ">" + x + "</option>";
+      }).join("");
+      var zeros = [], sittings = [];
+      for (var i = 0; i < co.times; i++) zeros.push("0");
+      for (var j = 0; j <= co.times; j++) sittings.push(c.units);
+      var note = g
+        ? "Counted as (" + zeros.concat([trimNum(pts)]).join(" + ") + ") ÷ (" + sittings.join(" + ") + "). " +
+          (co.times === 1 ? "The earlier F adds 0 points" : "Each earlier F adds 0 points") + " but its units still count."
+        : "Choose your new pass grade to count this course.";
+      panel = '<div class="co-panel"><div class="co-row">' +
+        '<label class="co-field"><span>Times carried over</span><div class="select-wrap"><select class="dropdown small" data-co-times="' + code + '">' + timesOptions(co.times) + "</select></div></label>" +
+        '<label class="co-field"><span>New pass grade</span><div class="select-wrap"><select class="dropdown small" data-co-grade="' + code + '">' + passOpts + "</select></div></label>" +
+        '</div><div class="co-note">' + note + "</div></div>";
+    }
+
     return '<div class="course' + (g ? " graded" : "") + (carried ? " carried" : "") + '">' +
       "<div>" +
-        '<div class="code">' + esc(c.code) + (carried ? ' <span class="co-badge">carried over</span>' : "") + "</div>" +
+        '<div class="code">' + code + (carried ? ' <span class="co-badge">carried over' + (co.times > 1 ? " ×" + co.times : "") + "</span>" : "") + "</div>" +
         (c.title ? '<div class="title">' + esc(c.title) + "</div>" : "") +
         '<div class="meta">' +
           "<span>Units<b>" + c.units + "</b></span>" +
           "<span>Grade pt<b>" + (gp === null ? "—" : gp) + "</b></span>" +
           "<span>Course pt<b>" + (pts === null ? "—" : trimNum(pts)) + "</b></span>" +
         "</div>" +
-        '<label class="check co-check"><input type="checkbox" data-carried="' + esc(c.code) + '"' + (carried ? " checked" : "") + "> Carried over (new grade after an earlier F)</label>" +
+        '<label class="check co-check"><input type="checkbox" data-carried="' + code + '"' + (carried ? " checked" : "") + "> Carried over</label>" +
       "</div>" +
-      '<select class="grade" data-grade="' + esc(c.code) + '" aria-label="Grade for ' + esc(c.code) + '">' + opts + "</select>" +
+      mainSelect + panel +
     "</div>";
   }
 
@@ -566,7 +712,7 @@
       var hayNoSpace = hay.replace(/\s+/g, "");
       if (hay.indexOf(q) === -1 && hayNoSpace.indexOf(q.replace(/\s+/g, "")) === -1) return false;
     }
-    if (ui.onlyGraded && !gradeOf(c.code)) return false;
+    if (ui.onlyGraded && !effectiveGrade(c.code)) return false;
     return true;
   }
 
@@ -576,6 +722,9 @@
     return '<section class="sem"><div class="sem-head"><h2>' + esc(title) + "</h2><span>" + stat + '</span></div><div class="list">' +
       list.map(courseHTML).join("") + "</div></section>";
   }
+
+  var NOTICE = '<p class="notice">Note: The carried Over option is for students who later passed that particular course after rewriting it. ' +
+    "If you are yet to retake and pass the course, select your grade as F in the Grade option.</p>";
 
   function message(text) {
     return '<div class="list" style="margin-top:20px"><div class="empty-msg">' + text + "</div></div>";
@@ -597,7 +746,7 @@
           if (list.length) html += semBlock(l + " Level · " + (s === 1 ? "First" : "Second") + " semester", list, full);
         });
       });
-      host.innerHTML = html || message("No courses match your search.");
+      host.innerHTML = html ? NOTICE + html : message("No courses match your search.");
       return;
     }
 
@@ -608,7 +757,7 @@
       host.innerHTML = message("You haven't graded any courses here yet. Untick “Show only courses I have graded” to add grades.");
       return;
     }
-    host.innerHTML = semBlock(ui.year + " Level · " + (ui.sem === 1 ? "First" : "Second") + " semester", list2, fullSem);
+    host.innerHTML = NOTICE + semBlock(ui.year + " Level · " + (ui.sem === 1 ? "First" : "Second") + " semester", list2, fullSem);
   }
 
   function renderAll() { renderHeader(); renderSummary(); syncSelectors(); renderContent(); }
@@ -634,18 +783,31 @@
   });
 
   el("content").addEventListener("change", function (e) {
-    var g = e.target.getAttribute("data-grade");
-    var co = e.target.getAttribute("data-carried");
     if (!state.dept) return;
+    var t = e.target;
+    var g = t.getAttribute("data-grade");
+    var co = t.getAttribute("data-carried");
+    var times = t.getAttribute("data-co-times");
+    var pass = t.getAttribute("data-co-grade");
     if (g) {
       var gm = bucket(state.grades);
-      if (e.target.value) gm[g] = e.target.value; else delete gm[g];
-      save(); renderSummary(); renderContent();
+      if (t.value) gm[g] = t.value; else delete gm[g];
     } else if (co) {
       var cm = bucket(state.carried);
-      if (e.target.checked) cm[co] = true; else delete cm[co];
-      save(); renderSummary(); renderContent();
+      if (t.checked) cm[co] = { times: 1, grade: ""  }; else delete cm[co];
+    } else if (times || pass) {
+      var entry = bucket(state.carried)[times || pass];
+      if (!entry) return;
+      if (times) {
+        var n = Math.floor(Number(t.value));
+        entry.times = (n >= 1 && n <= MAX_TIMES) ? n : 1;
+      } else {
+        entry.grade = PASS_GRADES.indexOf(t.value) !== -1 ? t.value : "";
+      }
+    } else {
+      return;
     }
+    save(); renderSummary(); renderContent();
   });
 
   el("search").addEventListener("input", function (e) {
